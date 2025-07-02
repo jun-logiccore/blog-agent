@@ -59,6 +59,8 @@ jobs:
 
     - name: Make package public
       if: github.event_name != 'pull_request'
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         # Get the package name from the repository
         PACKAGE_NAME="${{ github.repository }}"
