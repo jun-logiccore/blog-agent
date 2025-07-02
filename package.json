@@ -18,7 +18,7 @@
     "typescript"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@types/node": "^24.0.3",
     "axios": "^1.10.0",
