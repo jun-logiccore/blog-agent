@@ -1,0 +1,30 @@
+{
+  "name": "blog-agent",
+  "version": "1.0.0",
+  "description": "A TypeScript-based blog post generation agent using AI",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "blog",
+    "ai",
+    "content-generation",
+    "typescript"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^24.0.3",
+    "axios": "^1.10.0",
+    "dotenv": "^16.5.0",
+    "pexels": "^1.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
