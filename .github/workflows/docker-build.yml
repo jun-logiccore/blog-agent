@@ -56,17 +56,3 @@ jobs:
         cache-to: type=gha,mode=max
         platforms: linux/amd64,linux/arm64
         provenance: false
-
-    - name: Make package public
-      if: github.event_name != 'pull_request'
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        # Get the package name from the repository
-        PACKAGE_NAME="${{ github.repository }}"
-        
-        # Make the package public using GitHub CLI
-        gh api \
-          --method PUT \
-          /user/packages/container/$PACKAGE_NAME \
-          --field visibility=public
