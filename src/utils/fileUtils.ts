@@ -166,9 +166,13 @@ ${contentWithImages}
 function generateFrontmatter(post: BlogPost): string {
   const tags = post.tags.map((tag) => `"${tag}"`).join(", ");
 
+  // Only include cover_image if it exists
+  const coverImageLine = post.coverImageUrl
+    ? `cover_image: "${post.coverImageUrl}"`
+    : "";
+
   return `---
-title: "${post.title}"
-cover_image: "${post.coverImageUrl}"
+title: "${post.title}"${coverImageLine ? `\n${coverImageLine}` : ""}
 tags: [${tags}]
 category: "${post.category}"
 date: "${post.date}"

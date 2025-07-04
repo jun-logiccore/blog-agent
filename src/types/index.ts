@@ -1,11 +1,29 @@
 export interface BlogPost {
   title: string;
   content: string;
-  coverImageUrl: string;
+  coverImageUrl?: string;
   tags: string[];
   category: string;
   date: string;
   inlineImages?: InlineImage[];
+}
+
+export interface BlogOutline {
+  title: string;
+  introduction: string;
+  sections: BlogSection[];
+  conclusion: string;
+}
+
+export interface BlogSection {
+  title: string;
+  description: string;
+  subsections: BlogSubsection[];
+}
+
+export interface BlogSubsection {
+  title: string;
+  description: string;
 }
 
 export interface InlineImage {

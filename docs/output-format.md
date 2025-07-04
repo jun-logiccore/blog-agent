@@ -44,7 +44,7 @@ More content continues...
 - **Smart Image Placement**: Images are strategically placed throughout the content
 - **Pexels Attribution**: Proper credit with photographer name and links
 - **Contextual Images**: AI-generated search queries for relevant stock photos
-- **No Placeholder Images**: Posts are skipped if no valid Pexels images are found
+- **Graceful Image Handling**: Posts continue without images if Pexels service fails
 - **Image Validation**: Multiple validation layers ensure image authenticity
 
 ### 📝 **Enhanced Content Generation**
@@ -68,4 +68,4 @@ More content continues...
 - **No Placeholder Images**: Never uses generic placeholder images
 - **Graceful Degradation**: Skips posts if no valid cover image is found
 - **Optional Inline Images**: Continues without inline images if none are found
-- **Detailed Logging**: Reports image search results and validation status 
+- **Detailed Logging**: Reports image search results and validation status

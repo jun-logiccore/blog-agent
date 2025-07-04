@@ -45,85 +45,172 @@ export class PexelsService {
   }
 
   async findCoverImage(query: string): Promise<ApiResponse<string>> {
-    return withRetry(
-      async () => {
-        await this.throttleRequest();
+    try {
+      return await withRetry(
+        async () => {
+          await this.throttleRequest();
 
-        try {
-          // Sanitize the query to avoid problematic terms
-          const sanitizedQuery = this.sanitizeQuery(query);
+          try {
+            // Sanitize the query to avoid problematic terms
+            const sanitizedQuery = this.sanitizeQuery(query);
 
-          logger.debug(
-            `Searching for cover image with query: "${sanitizedQuery}"`
-          );
-
-          const result = await this.client.photos.search({
-            query: sanitizedQuery,
-            per_page: 5, // Get more results to filter from
-          });
-
-          this.requestCount++;
-          logger.debug(`Pexels API request count: ${this.requestCount}`);
-
-          if ("photos" in result && result.photos.length > 0) {
-            // Filter out screenshots and app-related images
-            const filteredPhotos = result.photos.filter(
-              (photo) =>
-                this.isValidPexelsPhoto(photo) &&
-                this.isStockPhotoContent(photo)
+            logger.debug(
+              `Searching for cover image with query: "${sanitizedQuery}"`
             );
 
-            if (filteredPhotos.length > 0) {
-              logger.debug(
-                `Found valid cover image for query: "${sanitizedQuery}"`
-              );
-              return {
-                success: true,
-                data: filteredPhotos[0].src.large,
-              };
-            }
-          }
+            const result = await this.client.photos.search({
+              query: sanitizedQuery,
+              per_page: 5, // Get more results to filter from
+            });
 
-          logger.warn(
-            `No valid stock photos found for cover image query: "${sanitizedQuery}"`
-          );
-          return {
-            success: false,
-            error: `No valid stock photos found for query: "${sanitizedQuery}"`,
-          };
-        } catch (error) {
-          logger.error(`Error finding cover image for "${query}":`, error);
-          handleApiError(error);
+            this.requestCount++;
+            logger.debug(`Pexels API request count: ${this.requestCount}`);
+
+            if ("photos" in result && result.photos.length > 0) {
+              // Filter out screenshots and app-related images
+              const filteredPhotos = result.photos.filter(
+                (photo) =>
+                  this.isValidPexelsPhoto(photo) &&
+                  this.isStockPhotoContent(photo)
+              );
+
+              if (filteredPhotos.length > 0) {
+                logger.debug(
+                  `Found valid cover image for query: "${sanitizedQuery}"`
+                );
+                return {
+                  success: true,
+                  data: filteredPhotos[0].src.large,
+                };
+              }
+            }
+
+            logger.warn(
+              `No valid stock photos found for cover image query: "${sanitizedQuery}"`
+            );
+            return {
+              success: false,
+              error: `No valid stock photos found for query: "${sanitizedQuery}"`,
+            };
+          } catch (error) {
+            logger.error(`Error finding cover image for "${query}":`, error);
+            handleApiError(error);
+          }
+        },
+        {
+          maxRetries: 3,
+          baseDelayMs: 1000,
+          maxDelayMs: 60000, // Up to 1 minute for rate limits
         }
-      },
-      {
-        maxRetries: 3,
-        baseDelayMs: 1000,
-        maxDelayMs: 60000, // Up to 1 minute for rate limits
-      }
-    );
+      );
+    } catch (error) {
+      logger.warn(`Pexels service unavailable for "${query}": ${error}`);
+      return {
+        success: false,
+        error: `Pexels service unavailable: ${error}`,
+      };
+    }
   }
 
   async findInlineImages(
     queries: string[],
     imagesPerQuery: number = 1
   ): Promise<ApiResponse<InlineImage[]>> {
-    return withRetry(
-      async () => {
-        try {
-          const allImages: InlineImage[] = [];
+    try {
+      return await withRetry(
+        async () => {
+          try {
+            const allImages: InlineImage[] = [];
 
-          for (const query of queries) {
-            await this.throttleRequest();
+            for (const query of queries) {
+              await this.throttleRequest();
 
+              const sanitizedQuery = this.sanitizeQuery(query);
+              logger.debug(
+                `Searching for inline images with sanitized query: "${sanitizedQuery}"`
+              );
+
+              const result = await this.client.photos.search({
+                query: sanitizedQuery,
+                per_page: imagesPerQuery * 3, // Get more results to filter from
+              });
+
+              this.requestCount++;
+              logger.debug(`Pexels API request count: ${this.requestCount}`);
+
+              if ("photos" in result && result.photos.length > 0) {
+                const validPhotos = result.photos.filter(
+                  (photo) =>
+                    this.isValidPexelsPhoto(photo) &&
+                    this.isStockPhotoContent(photo)
+                );
+
+                // Take only the requested number after filtering
+                const selectedPhotos = validPhotos.slice(0, imagesPerQuery);
+                const images = selectedPhotos.map((photo) =>
+                  this.convertToInlineImage(photo)
+                );
+                allImages.push(...images);
+
+                if (selectedPhotos.length > 0) {
+                  logger.debug(
+                    `Found ${selectedPhotos.length} valid stock photos for query: "${sanitizedQuery}"`
+                  );
+                } else {
+                  logger.debug(
+                    `No valid stock photos found for query: "${sanitizedQuery}" after filtering`
+                  );
+                }
+              } else {
+                logger.debug(`No images found for query: "${sanitizedQuery}"`);
+              }
+
+              // Add delay between queries to be respectful to the API
+              if (queries.length > 1) {
+                await this.delay(200);
+              }
+            }
+
+            logger.info(`Total valid stock photos found: ${allImages.length}`);
+            return {
+              success: true,
+              data: allImages,
+            };
+          } catch (error) {
+            logger.error(`Error finding inline images:`, error);
+            handleApiError(error);
+          }
+        },
+        {
+          maxRetries: 3,
+          baseDelayMs: 2000, // Longer delay for multiple requests
+          maxDelayMs: 60000,
+        }
+      );
+    } catch (error) {
+      logger.warn(`Pexels service unavailable for inline images: ${error}`);
+      return {
+        success: false,
+        error: `Pexels service unavailable: ${error}`,
+      };
+    }
+  }
+
+  async findImagesForQuery(
+    query: string,
+    count: number = 5
+  ): Promise<ApiResponse<string[]>> {
+    try {
+      return await withRetry(
+        async () => {
+          await this.throttleRequest();
+
+          try {
             const sanitizedQuery = this.sanitizeQuery(query);
-            logger.debug(
-              `Searching for inline images with sanitized query: "${sanitizedQuery}"`
-            );
 
             const result = await this.client.photos.search({
               query: sanitizedQuery,
-              per_page: imagesPerQuery * 3, // Get more results to filter from
+              per_page: count * 2, // Get more results to filter from
             });
 
             this.requestCount++;
@@ -135,106 +222,43 @@ export class PexelsService {
                   this.isValidPexelsPhoto(photo) &&
                   this.isStockPhotoContent(photo)
               );
+              const imageUrls = validPhotos
+                .slice(0, count)
+                .map((photo) => photo.src.large);
 
-              // Take only the requested number after filtering
-              const selectedPhotos = validPhotos.slice(0, imagesPerQuery);
-              const images = selectedPhotos.map((photo) =>
-                this.convertToInlineImage(photo)
-              );
-              allImages.push(...images);
-
-              if (selectedPhotos.length > 0) {
-                logger.debug(
-                  `Found ${selectedPhotos.length} valid stock photos for query: "${sanitizedQuery}"`
-                );
-              } else {
-                logger.debug(
-                  `No valid stock photos found for query: "${sanitizedQuery}" after filtering`
-                );
+              if (imageUrls.length > 0) {
+                return {
+                  success: true,
+                  data: imageUrls,
+                };
               }
-            } else {
-              logger.debug(`No images found for query: "${sanitizedQuery}"`);
             }
 
-            // Add delay between queries to be respectful to the API
-            if (queries.length > 1) {
-              await this.delay(200);
-            }
-          }
-
-          logger.info(`Total valid stock photos found: ${allImages.length}`);
-          return {
-            success: true,
-            data: allImages,
-          };
-        } catch (error) {
-          logger.error(`Error finding inline images:`, error);
-          handleApiError(error);
-        }
-      },
-      {
-        maxRetries: 3,
-        baseDelayMs: 2000, // Longer delay for multiple requests
-        maxDelayMs: 60000,
-      }
-    );
-  }
-
-  async findImagesForQuery(
-    query: string,
-    count: number = 5
-  ): Promise<ApiResponse<string[]>> {
-    return withRetry(
-      async () => {
-        await this.throttleRequest();
-
-        try {
-          const sanitizedQuery = this.sanitizeQuery(query);
-
-          const result = await this.client.photos.search({
-            query: sanitizedQuery,
-            per_page: count * 2, // Get more results to filter from
-          });
-
-          this.requestCount++;
-          logger.debug(`Pexels API request count: ${this.requestCount}`);
-
-          if ("photos" in result && result.photos.length > 0) {
-            const validPhotos = result.photos.filter(
-              (photo) =>
-                this.isValidPexelsPhoto(photo) &&
-                this.isStockPhotoContent(photo)
+            logger.warn(
+              `No valid stock photos found for query: "${sanitizedQuery}"`
             );
-            const imageUrls = validPhotos
-              .slice(0, count)
-              .map((photo) => photo.src.large);
-
-            if (imageUrls.length > 0) {
-              return {
-                success: true,
-                data: imageUrls,
-              };
-            }
+            return {
+              success: false,
+              error: `No valid stock photos found for query: "${sanitizedQuery}"`,
+            };
+          } catch (error) {
+            logger.error(`Error finding images for "${query}":`, error);
+            handleApiError(error);
           }
-
-          logger.warn(
-            `No valid stock photos found for query: "${sanitizedQuery}"`
-          );
-          return {
-            success: false,
-            error: `No valid stock photos found for query: "${sanitizedQuery}"`,
-          };
-        } catch (error) {
-          logger.error(`Error finding images for "${query}":`, error);
-          handleApiError(error);
+        },
+        {
+          maxRetries: 3,
+          baseDelayMs: 1000,
+          maxDelayMs: 60000,
         }
-      },
-      {
-        maxRetries: 3,
-        baseDelayMs: 1000,
-        maxDelayMs: 60000,
-      }
-    );
+      );
+    } catch (error) {
+      logger.warn(`Pexels service unavailable for "${query}": ${error}`);
+      return {
+        success: false,
+        error: `Pexels service unavailable: ${error}`,
+      };
+    }
   }
 
   private async throttleRequest(): Promise<void> {

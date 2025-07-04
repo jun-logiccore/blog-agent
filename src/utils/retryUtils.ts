@@ -145,7 +145,7 @@ export function handleApiError(error: any): never {
       throw new Error(
         `Client error (${status}): ${
           error.response.statusText || error.message
-        }`
+        }. Response body: ${JSON.stringify(error.response.data)}`
       );
     }
   }
